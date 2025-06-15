@@ -38,17 +38,24 @@ function Hero() {
                 messages: [msg]
             });
             
-            // console.log(workspaceId);
             router.push(`/workspace/${workspaceId}?prompt=${encodeURIComponent(input)}`);
         } catch (error) {
             console.error('Error creating workspace:', error);
-        } finally {
             setIsLoading(false);
         }
     };
 
     return (
-        <div className="relative flex items-center justify-center px-4 py-5 overflow-hidden">
+        <div className="relative flex items-center justify-center px-4 py-3 overflow-hidden">
+            {isLoading && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
+                    <div className="flex flex-col items-center gap-4">
+                        <Loader2 className="animate-spin text-blue-500" size={40} />
+                        <h2 className="text-white text-lg font-medium">Creating your workspace...</h2>
+                        <p className="text-gray-400 text-sm">Please wait while we set up your development environment</p>
+                    </div>
+                </div>
+            )}
             <div className="relative z-10 flex flex-col items-center text-center max-w-3xl w-full space-y-6">
                 <h2 className="text-4xl md:text-5xl font-bold text-white">
                     What do you want to build today?
@@ -121,6 +128,7 @@ function Hero() {
                             ))}
                         </div>
                     </div>
+            <p className='text-gray-400 text-sm mt-2'>Make sure to refresh the page if code is not generated</p>
                 </StarBorder>
             </div>
             <SignInDialog openDialog={openDialog} closeDialog={(v) => setOpenDialog(false)} />

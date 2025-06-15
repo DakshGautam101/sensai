@@ -32,6 +32,37 @@ const CodeView = () => {
           });
           if (result?.messages) {
             setMessages(result.messages);
+            // Generate code if there are messages
+            if (result.messages.length > 0) {
+              const lastMessage = result.messages[result.messages.length - 1];
+              if (lastMessage?.content) {
+                try {
+                  const codeResult = await axios.post('/api/codegenerate', {
+                    prompt: lastMessage.content
+                  });
+                  console.log('Initial code generation:', codeResult.data);
+                  let code = '';
+                  if (Array.isArray(codeResult.data.result)) {
+                    const appFile = codeResult.data.result.find(f => f.filename === 'App.js' || f.filename === '/App.js' || f.filename === '/src/App.js');
+                    if (appFile) code = appFile.content;
+                  } else if (codeResult.data?.result?.files) {
+                    if (codeResult.data.result.files['/App.js']) {
+                      code = codeResult.data.result.files['/App.js'].code;
+                    } else if (codeResult.data.result.files['/src/App.js']) {
+                      code = codeResult.data.result.files['/src/App.js'].code;
+                    }
+                  } else if (codeResult.data?.result?.code) {
+                    code = codeResult.data.result.code;
+                  }
+                  if (!/export\s+default/.test(code)) {
+                    code += '\n\nexport default function App() { return <div>App</div>; }';
+                  }
+                  setAppCode(code);
+                } catch (error) {
+                  console.error('Error in initial code generation:', error);
+                }
+              }
+            }
           }
         } catch (err) {
           console.error('Error fetching workspace messages:', err);
