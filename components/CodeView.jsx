@@ -1,5 +1,5 @@
 "use client";
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import {
   SandpackProvider,
   SandpackLayout,
@@ -22,8 +22,7 @@ const CodeView = () => {
   const params = useParams();
   const convex = useConvex();
 
-  // Fetch messages if empty
-  React.useEffect(() => {
+  useEffect(() => {
     const fetchMessages = async () => {
       if (params?.id && messages.length === 0) {
         try {
@@ -32,37 +31,6 @@ const CodeView = () => {
           });
           if (result?.messages) {
             setMessages(result.messages);
-            // Generate code if there are messages
-            if (result.messages.length > 0) {
-              const lastMessage = result.messages[result.messages.length - 1];
-              if (lastMessage?.content) {
-                try {
-                  const codeResult = await axios.post('/api/codegenerate', {
-                    prompt: lastMessage.content
-                  });
-                  console.log('Initial code generation:', codeResult.data);
-                  let code = '';
-                  if (Array.isArray(codeResult.data.result)) {
-                    const appFile = codeResult.data.result.find(f => f.filename === 'App.js' || f.filename === '/App.js' || f.filename === '/src/App.js');
-                    if (appFile) code = appFile.content;
-                  } else if (codeResult.data?.result?.files) {
-                    if (codeResult.data.result.files['/App.js']) {
-                      code = codeResult.data.result.files['/App.js'].code;
-                    } else if (codeResult.data.result.files['/src/App.js']) {
-                      code = codeResult.data.result.files['/src/App.js'].code;
-                    }
-                  } else if (codeResult.data?.result?.code) {
-                    code = codeResult.data.result.code;
-                  }
-                  if (!/export\s+default/.test(code)) {
-                    code += '\n\nexport default function App() { return <div>App</div>; }';
-                  }
-                  setAppCode(code);
-                } catch (error) {
-                  console.error('Error in initial code generation:', error);
-                }
-              }
-            }
           }
         } catch (err) {
           console.error('Error fetching workspace messages:', err);
@@ -72,17 +40,20 @@ const CodeView = () => {
     fetchMessages();
   }, [params?.id]);
 
-  const GenerateAICode = async () => {
-    try {
-      if (isGenerating) return;
-      setIsGenerating(true);
-      if (!messages || messages.length === 0) return;
-      const lastMessage = messages[messages.length - 1];
-      if (!lastMessage?.content) return;
-      const result = await axios.post('/api/codegenerate', {
-        prompt: lastMessage.content
-      });
-      console.log('AI response:', result.data);
+  
+    const GenerateAICode = async () => {
+  try {
+    if (isGenerating || !messages || messages.length < 2) return;
+
+    const lastMessage = messages[messages.length - 1];
+    if (!lastMessage?.content) return; // 👈 Prevent invalid prompt
+
+    setIsGenerating(true);
+
+    const result = await axios.post('/api/codegenerate', {
+      prompt: lastMessage.content
+    });
+
       let code = '';
       if (Array.isArray(result.data.result)) {
         const appFile = result.data.result.find(f => f.filename === 'App.js' || f.filename === '/App.js' || f.filename === '/src/App.js');
@@ -96,11 +67,12 @@ const CodeView = () => {
       } else if (result.data?.result?.code) {
         code = result.data.result.code;
       }
-      // Only add fallback if there is NO export default
+
       if (!/export\s+default/.test(code)) {
         code += '\n\nexport default function App() { return <div>App</div>; }';
       }
       setAppCode(code);
+
     } catch (error) {
       console.error('Error in GenerateAICode:', error);
     } finally {
@@ -108,12 +80,11 @@ const CodeView = () => {
     }
   };
 
-  // Trigger code generation when messages change
-  React.useEffect(() => {
-    if (messages && messages.length > 1) {
-      const lastMessage = messages[messages.length - 1];
-      const prevMessage = messages[messages.length - 2];
-      if (lastMessage?.role === 'assistant' && prevMessage?.role === 'user') {
+  useEffect(() => {
+    if (messages.length >= 2) {
+      const last = messages[messages.length - 1];
+      const secondLast = messages[messages.length - 2];
+      if (last?.role === 'assistant' && secondLast?.role === 'user') {
         GenerateAICode();
       }
     }
@@ -127,7 +98,7 @@ const CodeView = () => {
           <span className="mt-4 text-blue-300 font-medium text-sm">Generating code...</span>
         </div>
       )}
-  
+
       <div className='bg-[#181818] w-full p-2 border rounded-md mb-2'>
         <div className='flex items-center flex-wrap shrink-0 bg-black p-1 w-[140px] gap-3 justify-center rounded-full'>
           <h2
@@ -144,15 +115,13 @@ const CodeView = () => {
           </h2>
         </div>
       </div>
-  
+
       <div className='h-[78vh]'>
         <SandpackProvider
           template="react"
           theme="dark"
           files={{ '/App.js': { code: appCode } }}
-          customSetup={{
-            dependencies: lookups.DEPENDENCIES
-          }}
+          customSetup={{ dependencies: lookups.DEPENDENCIES }}
           options={{
             externalResources: ['https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4']
           }}
@@ -171,6 +140,6 @@ const CodeView = () => {
       </div>
     </div>
   );
-}
+};
 
 export default CodeView;

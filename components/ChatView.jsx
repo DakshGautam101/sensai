@@ -20,8 +20,6 @@ const ChatView = () => {
   const [chatMessages, setChatMessages] = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [workspaceReady, setWorkspaceReady] = useState(false);
-  const [initialPromptHandled, setInitialPromptHandled] = useState(false);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -60,8 +58,6 @@ const ChatView = () => {
       setMessages(result.messages);
       setChatMessages(Array.isArray(result.messages) ? result.messages : [result.messages]);
     }
-
-    setWorkspaceReady(true);
   };
 
   const onGenarate = async (input) => {
@@ -70,6 +66,13 @@ const ChatView = () => {
     const newMessages = [...chatMessages, { content: input, role: 'user' }];
     setChatMessages(newMessages);
     setInput('');
+
+    try {
+      console.log("Calling /api/codegenerate with input:", input);
+      await axios.post('/api/codegenerate', { prompt: input });
+    } catch (error) {
+      console.error('Error generating code immediately after user input:', error);
+    }
 
     const loadingMessage = { content: 'Thinking...', role: 'assistant', temp: true };
     setChatMessages((prev) => [...prev, loadingMessage]);
@@ -87,50 +90,24 @@ const ChatView = () => {
       const data = await res.json();
 
       if (data.success) {
-        const updatedMessages = [
-          ...newMessages,
-          { content: data.message, role: 'assistant' }
-        ];
+        const assistantMessage = { content: data.message, role: 'assistant' };
+        const updatedMessages = [...newMessages, assistantMessage];
 
         setChatMessages(updatedMessages);
+        setMessages(updatedMessages); // ✅ Important: update context
 
         await convex.mutation(api.workspace.updateMessages, {
           workspaceId: id,
           messages: updatedMessages
         });
 
-        try {
-          await axios.post('/api/codegenerate', {
-            prompt: data.message
-          });
-        } catch (error) {
-          console.error('Error generating code:', error);
-        }
-
       } else {
         setChatMessages(newMessages);
-
-        try {
-          await axios.post('/api/codegenerate', {
-            prompt: input
-          });
-        } catch (error) {
-          console.error('Error generating code:', error);
-        }
       }
 
     } catch (err) {
       console.error('ChatView: Error generating AI response:', err);
       setChatMessages(newMessages);
-
-      try {
-        await axios.post('/api/codegenerate', {
-          prompt: input
-        });
-      } catch (error) {
-        console.error('Error generating code:', error);
-      }
-
     } finally {
       setIsGenerating(false);
       setLoading(false);
@@ -145,11 +122,7 @@ const ChatView = () => {
             <div className="flex gap-3 items-start">
               {msg.role === 'user' && UserDetail?.picture && (
                 <div className="relative w-8 h-8 shrink-0">
-                  <img
-                    src={UserDetail.picture}
-                    alt="user"
-                    className="w-8 h-8 rounded-full object-cover"
-                  />
+                  <img src={UserDetail.picture} alt="user" className="w-8 h-8 rounded-full object-cover" />
                 </div>
               )}
               <div className="text-sm leading-relaxed whitespace-pre-wrap">
@@ -199,4 +172,3 @@ const ChatView = () => {
 };
 
 export default ChatView;
-  
