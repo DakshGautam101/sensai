@@ -113,6 +113,7 @@ const ChatView = () => {
       setLoading(false);
     }
   };
+  
 
   return (
     <div className="relative h-[85vh] flex flex-col bg-[#0f0f0f] text-white rounded-xl overflow-hidden">
